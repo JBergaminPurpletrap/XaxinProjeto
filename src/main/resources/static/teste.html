@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xaxin QR Code - Teste</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { text-align: center; color: #1a73e8; margin-bottom: 5px; font-size: 28px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 25px; font-size: 14px; }
+        
+        .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .card-title { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .card-title .badge { font-size: 11px; background: #e8f0fe; color: #1a73e8; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+        
+        .row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+        .row label { min-width: 80px; font-size: 13px; color: #555; display: flex; align-items: center; }
+        input[type="text"], input[type="password"] { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; outline: none; transition: border 0.2s; }
+        input:focus { border-color: #1a73e8; }
+        
+        .btn { padding: 8px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; }
+        .btn-primary { background: #1a73e8; color: #fff; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-success { background: #188038; color: #fff; }
+        .btn-success:hover { background: #13602c; }
+        .btn-danger { background: #d93025; color: #fff; }
+        .btn-danger:hover { background: #a50e0e; }
+        .btn-outline { background: #fff; color: #333; border: 1px solid #ddd; }
+        .btn-outline:hover { background: #f5f5f5; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .output { background: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 6px; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; margin-top: 8px; min-height: 30px; max-height: 200px; overflow-y: auto; }
+        .output.success { border-left: 4px solid #188038; }
+        .output.error { border-left: 4px solid #d93025; }
+        
+        .token-box { background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 8px 12px; margin-top: 5px; font-size: 11px; word-break: break-all; display: none; }
+        .token-box label { font-weight: 600; color: #856404; }
+        .token-box .token-value { color: #333; }
+        
+        .progress-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+        .checkpoint-item { padding: 8px 12px; border-radius: 6px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+        .checkpoint-item.lido { border-color: #188038; background: #e6f4ea; }
+        .checkpoint-item .status { font-weight: 600; }
+        .checkpoint-item .status.ok { color: #188038; }
+        .checkpoint-item .status.pend { color: #999; }
+        
+        .hidden { display: none; }
+        .mt-8 { margin-top: 8px; }
+        .flex { display: flex; gap: 8px; align-items: center; }
+        .text-center { text-align: center; }
+        
+        @media (max-width: 600px) {
+            .row { flex-direction: column; }
+            .row label { min-width: auto; }
+            .progress-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📱 Xaxin QR Code</h1>
+    <p class="subtitle">Interface de teste para as APIs do projeto</p>
+
+    <!-- STATUS DO SERVIDOR -->
+    <div class="card" id="statusCard">
+        <div class="card-title">🔌 Status do Servidor</div>
+        <div class="flex">
+            <span id="statusIndicator" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#999;"></span>
+            <span id="statusText">Verificando...</span>
+            <button class="btn btn-outline" onclick="checkStatus()">🔄 Verificar</button>
+        </div>
+    </div>
+
+    <!-- CADASTRO -->
+    <div class="card">
+        <div class="card-title">📝 Cadastro <span class="badge">POST /api/users/cadastro</span></div>
+        <div class="row">
+            <label>Usuário:</label>
+            <input type="text" id="cadUsername" placeholder="ex: joao" value="joao">
+        </div>
+        <div class="row">
+            <label>Senha:</label>
+            <input type="password" id="cadPassword" placeholder="ex: 123" value="123">
+        </div>
+        <div class="row">
+            <label>Nome:</label>
+            <input type="text" id="cadNome" placeholder="ex: João Silva" value="João">
+        </div>
+        <button class="btn btn-primary" onclick="cadastrar()">📌 Cadastrar</button>
+        <div id="cadOutput" class="output mt-8"></div>
+    </div>
+
+    <!-- LOGIN -->
+    <div class="card">
+        <div class="card-title">🔑 Login <span class="badge">POST /api/users/login</span></div>
+        <div class="row">
+            <label>Usuário:</label>
+            <input type="text" id="logUsername" placeholder="ex: joao" value="joao">
+        </div>
+        <div class="row">
+            <label>Senha:</label>
+            <input type="password" id="logPassword" placeholder="ex: 123" value="123">
+        </div>
+        <button class="btn btn-success" onclick="login()">🔓 Login</button>
+        <div id="logOutput" class="output mt-8"></div>
+        <div class="token-box" id="tokenBox">
+            <label>🔑 Token JWT:</label>
+            <div class="token-value" id="tokenValue"></div>
+            <div style="margin-top:4px;font-size:11px;color:#856404;">⏱ Expira em 2 dias</div>
+        </div>
+    </div>
+
+    <!-- VALIDAÇÃO DE QR -->
+    <div class="card">
+        <div class="card-title">✅ Validar QR Code <span class="badge">POST /api/qrcode/validar-texto</span></div>
+        <div class="row">
+            <label>Código:</label>
+            <input type="text" id="qrCodigo" placeholder="ex: 1001, 2002, 3003, 4004" value="1001">
+        </div>
+        <button class="btn btn-primary" onclick="validarQR()">✅ Validar</button>
+        <div id="qrOutput" class="output mt-8"></div>
+    </div>
+
+    <!-- PROGRESSO -->
+    <div class="card">
+        <div class="card-title">📊 Progresso <span class="badge">GET /api/qrcode/progresso</span></div>
+        <div class="flex">
+            <button class="btn btn-primary" onclick="verProgresso()">📊 Ver Progresso</button>
+        </div>
+        <div id="progOutput" class="output mt-8"></div>
+        <div id="progressGrid" class="progress-grid hidden"></div>
+    </div>
+
+    <!-- LEITURA DE IMAGEM -->
+    <div class="card">
+        <div class="card-title">🖼️ Ler QR de Imagem <span class="badge">POST /api/qrcode/ler</span></div>
+        <div class="row">
+            <label>Caminho:</label>
+            <input type="text" id="imgCaminho" placeholder='ex: C:\qr.png' value="C:\qr.png">
+        </div>
+        <button class="btn btn-primary" onclick="lerImagem()">📷 Ler Imagem</button>
+        <div id="imgOutput" class="output mt-8"></div>
+    </div>
+
+    <!-- CHECKPOINTS REFERENCIA -->
+    <div class="card" style="background:#e8f0fe;">
+        <div class="card-title">📋 Checkpoints (QR Codes válidos)</div>
+        <div class="progress-grid">
+            <div class="checkpoint-item"><span>1️⃣ 1001</span><span>Início</span></div>
+            <div class="checkpoint-item"><span>2️⃣ 2002</span><span>Meio do trajeto</span></div>
+            <div class="checkpoint-item"><span>3️⃣ 3003</span><span>Quase lá</span></div>
+            <div class="checkpoint-item"><span>4️⃣ 4004</span><span>Final</span></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let token = '';
+
+    function showOutput(id, data, isError) {
+        const el = document.getElementById(id);
+        el.className = 'output ' + (isError ? 'error' : 'success');
+        if (typeof data === 'string') {
+            el.textContent = data;
+        } else {
+            el.textContent = JSON.stringify(data, null, 2);
+        }
+    }
+
+    function getToken() {
+        if (!token) {
+            const t = document.getElementById('tokenValue').textContent.trim();
+            if (t) token = t;
+        }
+        return token;
+    }
+
+    async function apiCall(method, url, body, useToken = false) {
+        const headers = { 'Content-Type': 'application/json' };
+        if (useToken) {
+            const t = getToken();
+            if (t) headers['Authorization'] = 'Bearer ' + t;
+        }
+        const opts = { method, headers };
+        if (body) opts.body = JSON.stringify(body);
+        const res = await fetch(url, opts);
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch(e) { data = text; }
+        return { status: res.status, data, ok: res.ok };
+    }
+
+    async function checkStatus() {
+        const ind = document.getElementById('statusIndicator');
+        const txt = document.getElementById('statusText');
+        try {
+            const r = await fetch('http://localhost:8080/api/qrcode/progresso', { method: 'GET' });
+            ind.style.background = '#188038';
+            txt.textContent = '✅ Servidor online (' + r.status + ')';
+        } catch(e) {
+            ind.style.background = '#d93025';
+            txt.textContent = '❌ Servidor offline - ' + e.message;
+        }
+    }
+    checkStatus();
+
+    async function cadastrar() {
+        const u = document.getElementById('cadUsername').value;
+        const p = document.getElementById('cadPassword').value;
+        const n = document.getElementById('cadNome').value;
+        const r = await apiCall('POST', 'http://localhost:8080/api/users/cadastro', { username: u, password: p, nome: n });
+        showOutput('cadOutput', (r.status + ' - ') + JSON.stringify(r.data, null, 2), !r.ok);
+        if (r.ok && r.data.token) {
+            token = r.data.token;
+            document.getElementById('tokenValue').textContent = token;
+            document.getElementById('tokenBox').style.display = 'block';
+        }
+    }
+
+    async function login() {
+        const u = document.getElementById('logUsername').value;
+        const p = document.getElementById('logPassword').value;
+        const r = await apiCall('POST', 'http://localhost:8080/api/users/login', { username: u, password: p });
+        showOutput('logOutput', (r.status + ' - ') + JSON.stringify(r.data, null, 2), !r.ok);
+        if (r.ok && r.data.token) {
+            token = r.data.token;
+            document.getElementById('tokenValue').textContent = token;
+            document.getElementById('tokenBox').style.display = 'block';
+        }
+    }
+
+    async function validarQR() {
+        const cod = document.getElementById('qrCodigo').value;
+        const r = await apiCall('POST', 'http://localhost:8080/api/qrcode/validar-texto', { codigo: cod }, true);
+        showOutput('qrOutput', (r.status + ' - ') + (typeof r.data === 'string' ? r.data : JSON.stringify(r.data)), !r.ok);
+    }
+
+    async function verProgresso() {
+        const r = await apiCall('GET', 'http://localhost:8080/api/qrcode/progresso', null, true);
+        showOutput('progOutput', (r.status + ' - ') + JSON.stringify(r.data, null, 2), !r.ok);
+        if (r.ok && r.data.checkpoints) {
+            const grid = document.getElementById('progressGrid');
+            grid.classList.remove('hidden');
+            grid.innerHTML = '';
+            r.data.checkpoints.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'checkpoint-item' + (c.lido ? ' lido' : '');
+                div.innerHTML = '<span>' + c.ordem + '. ' + c.titulo + '</span><span class="status ' + (c.lido ? 'ok' : 'pend') + '">' + (c.lido ? '✅ Lido' : '⏳ Pendente') + '</span>';
+                grid.appendChild(div);
+            });
+        }
+    }
+
+    async function lerImagem() {
+        const cam = document.getElementById('imgCaminho').value;
+        const r = await apiCall('POST', 'http://localhost:8080/api/qrcode/ler', { caminho: cam }, true);
+        showOutput('imgOutput', (r.status + ' - ') + (typeof r.data === 'string' ? r.data : JSON.stringify(r.data)), !r.ok);
+    }
+</script>
+</body>
+</html>
