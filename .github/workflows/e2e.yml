@@ -1,0 +1,79 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: 'maven'
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+
+      - name: Build (skip tests)
+        run: mvn -B clean package -DskipTests
+
+      - name: Make scripts executable
+        run: chmod +x scripts/e2e-test.sh || true
+
+      - name: Run E2E script
+        # script starts the jar, runs the flow and writes target/e2e-report.md
+        run: ./scripts/e2e-test.sh
+
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            target/e2e-report.md
+            target/xaxin-projeto-qrcode-*.jar
+
+  e2e-windows:
+    name: E2E Tests (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: 'maven'
+
+      - name: Build (skip tests)
+        run: mvn -B clean package -DskipTests
+
+      - name: Run E2E PowerShell
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\e2e-test.ps1 -NoStart
+
+      - name: Upload E2E report (Windows)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report-windows
+          path: |
+            target/e2e-report.md
+            target/xaxin-projeto-qrcode-*.jar
