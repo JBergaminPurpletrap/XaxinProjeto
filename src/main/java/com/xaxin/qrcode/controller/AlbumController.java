@@ -81,9 +81,10 @@ public class AlbumController {
                 "url", foto.getUrl()
             ));
         } catch (IllegalStateException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Erro ao enviar foto: " + e.getMessage());
+            String detail = e.getMessage() != null ? e.getMessage() : e.toString();
+            return ResponseEntity.internalServerError().body(Map.of("error", "Erro ao enviar foto", "details", detail));
         }
     }
 
