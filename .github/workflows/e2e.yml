@@ -7,6 +7,90 @@ on:
     branches: [ main, master ]
 
 jobs:
+  smoke:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: 'maven'
+
+      - name: Build (skip tests)
+        run: mvn -B -DskipTests package
+
+      - name: Start app (H2 profile) in background
+        run: |
+          mvn -Dspring-boot.run.profiles=h2 -DskipTests spring-boot:run &
+          echo "APP_PID=$!" > app.pid
+
+      - name: Wait for health
+        run: |
+          for i in {1..40}; do
+            if curl -sSf http://localhost:8080/actuator/health >/dev/null 2>&1; then echo ok; exit 0; fi
+            sleep 1
+          done
+          cat /proc/$(cat app.pid | cut -d= -f2)/cmdline || true
+          exit 1
+
+      - name: Smoke: register + login + progresso
+        run: |
+          curl -sS -X POST http://localhost:8080/api/users/cadastro -H 'Content-Type: application/json' -d '{"username":"smoketest","password":"123","nome":"Smoke"}' || true
+          TOKEN=$(curl -sS -X POST http://localhost:8080/api/users/login -H 'Content-Type: application/json' -d '{"username":"smoketest","password":"123"}' | jq -r .data.token // .token)
+          echo "token=$TOKEN"
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then echo "login failed"; exit 1; fi
+          curl -sS -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/qrcode/progresso | jq
+
+      - name: Stop app
+        run: |
+          if [ -f app.pid ]; then kill $(cat app.pid | cut -d= -f2) || true; fi
+
+  smoke-windows:
+    name: Smoke Tests (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: 'maven'
+
+      - name: Build (skip tests)
+        run: mvn -B -DskipTests package
+        shell: pwsh
+
+      - name: Start app (H2) in background
+        shell: pwsh
+        run: |
+          Start-Process -NoNewWindow -FilePath java -ArgumentList '-jar','target\xaxin-projeto-qrcode-1.0.0.jar','--spring.profiles.active=h2' -PassThru | Out-File -FilePath app_pid.txt
+
+      - name: Wait for health (Windows)
+        shell: pwsh
+        run: |
+          $i=0; while ($i -lt 40) { try { Invoke-RestMethod -Uri 'http://localhost:8080/actuator/health' -TimeoutSec 2; Write-Output 'ok'; exit 0 } catch { Start-Sleep -Seconds 1; $i++ } }; exit 1
+
+      - name: Smoke: register + login + progresso
+        shell: pwsh
+        run: |
+          Invoke-RestMethod -Uri 'http://localhost:8080/api/users/cadastro' -Method Post -Body (@{username='smoketest';password='123';nome='Smoke'} | ConvertTo-Json) -ContentType 'application/json' -ErrorAction SilentlyContinue
+          $login = Invoke-RestMethod -Uri 'http://localhost:8080/api/users/login' -Method Post -Body (@{username='smoketest';password='123'} | ConvertTo-Json) -ContentType 'application/json'
+          if (-not $login.token) { Write-Error 'login failed'; exit 1 }
+          Invoke-RestMethod -Uri 'http://localhost:8080/api/qrcode/progresso' -Headers @{ Authorization = "Bearer $($login.token)" }
+
+      - name: Stop app (Windows)
+        shell: pwsh
+        run: |
+          if (Test-Path app_pid.txt) { gc app_pid.txt | Stop-Process -ErrorAction SilentlyContinue }
+
   e2e:
     runs-on: ubuntu-latest
     steps:
