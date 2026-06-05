@@ -1,8 +1,17 @@
 package com.xaxin.qrcode.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Envelope padrão para respostas da API")
 public class ApiResponse<T> {
+
+    @Schema(description = "Indica se a operação foi bem sucedida")
     private boolean success;
+
+    @Schema(description = "Mensagem opcional curta sobre a resposta")
     private String message;
+
+    @Schema(description = "Payload da resposta")
     private T data;
 
     public ApiResponse() {}
