@@ -500,6 +500,31 @@ Resposta de sucesso:
 }
 ```
 
+## Notas importantes antes do desenvolvimento do Front-end
+
+Antes de começar a implementar o front-end, certifique-se destas configurações no backend:
+
+- `JWT_SECRET` (variável de ambiente): **obrigatória**. A aplicação não inicia se não existir ou se for menor que 32 caracteres.
+- `FRONTEND_ORIGINS` (variável de ambiente opcional): lista de origens CORS permitidas, separadas por vírgula. Exemplo: `http://localhost:3000,https://app.seudominio.com`. Se não definida, usa `http://localhost:3000` por padrão.
+
+Exemplo de execução local (PowerShell):
+
+```powershell
+$env:JWT_SECRET = "uma-chave-muito-segura-com-32-ou-mais-caracteres"
+$env:FRONTEND_ORIGINS = "http://localhost:3000"
+mvn -DskipTests spring-boot:run
+```
+
+Migração de dados para `qr_numbers.user_id`:
+
+- Foi adicionada uma migração placeholder em `src/main/resources/db/migration/V3__populate_qr_user.sql`.
+- A migração automática requer uma regra de mapeamento entre registros legados e usuários (ex.: assoc. por algum campo auxiliar). Se não houver regra, deixe `user_id` nulo e execute a migração manualmente quando houver política de mapeamento.
+
+Se quiser, eu posso:
+- adicionar um script Java/SQL para tentar popular `user_id` com uma heurística (forneça a regra), ou
+- manter a migração como manual e documentar os passos.
+
+
 Possiveis erros:
 
 | Status | Motivo |
