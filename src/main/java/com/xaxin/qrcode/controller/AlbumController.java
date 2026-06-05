@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.xaxin.qrcode.dto.ApiResponse;
 import com.xaxin.qrcode.model.Album;
 import com.xaxin.qrcode.model.Foto;
 import com.xaxin.qrcode.model.User;
@@ -44,7 +45,7 @@ public class AlbumController {
         if (user == null) return ResponseEntity.status(401).body("Usuário não encontrado");
 
         Album album = albumService.getOrCreateAlbum(user);
-        return ResponseEntity.ok(Map.of(
+        Map<String, Object> payload = Map.of(
             "id", album.getId(),
             "username", user.getUsername(),
             "routeComplete", album.isRouteComplete(),
@@ -56,7 +57,9 @@ public class AlbumController {
                 "url", f.getUrl(),
                 "uploadedAt", f.getUploadedAt().toString()
             )).toList()
-        ));
+        );
+
+        return ResponseEntity.ok(ApiResponse.ok(payload));
     }
 
     /**
@@ -69,22 +72,24 @@ public class AlbumController {
         if (user == null) return ResponseEntity.status(401).body("Usuário não encontrado");
 
         if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("Arquivo vazio");
+            return ResponseEntity.badRequest().body(ApiResponse.error("Arquivo vazio"));
         }
 
         try {
             Foto foto = albumService.uploadFoto(user, file);
-            return ResponseEntity.ok(Map.of(
+            Map<String, Object> payload = Map.of(
                 "mensagem", "Foto enviada com sucesso",
                 "id", foto.getId(),
                 "fileName", foto.getFileName(),
                 "url", foto.getUrl()
-            ));
+            );
+
+            return ResponseEntity.ok(ApiResponse.ok(payload));
         } catch (IllegalStateException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
             String detail = e.getMessage() != null ? e.getMessage() : e.toString();
-            return ResponseEntity.internalServerError().body(Map.of("error", "Erro ao enviar foto", "details", detail));
+            return ResponseEntity.internalServerError().body(ApiResponse.error("Erro ao enviar foto: " + detail));
         }
     }
 
@@ -108,16 +113,17 @@ public class AlbumController {
         try {
             String caminho = albumService.aplicarMoldura(user, fotoId, frameIndex);
             String fileName = new java.io.File(caminho).getName();
-            return ResponseEntity.ok(Map.of(
+            Map<String, Object> payload = Map.of(
                 "mensagem", "Moldura aplicada com sucesso!",
                 "frame", frameIndex,
                 "arquivo", fileName,
                 "url", "/uploads/" + fileName
-            ));
+            );
+            return ResponseEntity.ok(ApiResponse.ok(payload));
         } catch (IllegalStateException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Erro ao aplicar moldura: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(ApiResponse.error("Erro ao aplicar moldura: " + e.getMessage()));
         }
     }
 }

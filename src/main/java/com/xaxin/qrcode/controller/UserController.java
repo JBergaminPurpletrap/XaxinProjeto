@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xaxin.qrcode.dto.ApiResponse;
 import com.xaxin.qrcode.model.User;
 import com.xaxin.qrcode.security.JwtTokenProvider;
 import com.xaxin.qrcode.service.UserService;
@@ -35,21 +36,23 @@ public class UserController {
         String nome = body.get("nome");
 
         if (username == null || password == null || nome == null) {
-            return ResponseEntity.badRequest().body("Campos obrigatórios: username, password, nome");
+            return ResponseEntity.badRequest().body(ApiResponse.error("Campos obrigatórios: username, password, nome"));
         }
 
         User user = userService.cadastrar(username, password, nome);
         if (user == null) {
-            return ResponseEntity.badRequest().body("Username já existe: " + username);
+            return ResponseEntity.badRequest().body(ApiResponse.error("Username já existe: " + username));
         }
 
         String token = jwtTokenProvider.gerarToken(user.getUsername());
 
-        return ResponseEntity.ok(Map.of(
+        Map<String, Object> payload = Map.of(
             "mensagem", "Usuário cadastrado: " + user.getUsername(),
             "username", user.getUsername(),
             "token", token
-        ));
+        );
+
+        return ResponseEntity.ok(ApiResponse.ok(payload));
     }
 
     /**
@@ -63,21 +66,23 @@ public class UserController {
         String password = body.get("password");
 
         if (username == null || password == null) {
-            return ResponseEntity.badRequest().body("Campos obrigatórios: username, password");
+            return ResponseEntity.badRequest().body(ApiResponse.error("Campos obrigatórios: username, password"));
         }
 
         User user = userService.login(username, password);
         if (user == null) {
-            return ResponseEntity.status(401).body("Credenciais inválidas");
+            return ResponseEntity.status(401).body(ApiResponse.error("Credenciais inválidas"));
         }
 
         String token = jwtTokenProvider.gerarToken(user.getUsername());
 
-        return ResponseEntity.ok(Map.of(
+        Map<String, Object> payload = Map.of(
             "mensagem", "Login OK! Bem-vindo, " + user.getNome(),
             "username", user.getUsername(),
             "nome", user.getNome(),
             "token", token
-        ));
+        );
+
+        return ResponseEntity.ok(ApiResponse.ok(payload));
     }
 }

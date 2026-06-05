@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.xaxin.qrcode.model.Checkpoint;
 import com.xaxin.qrcode.service.QrCodeService;
 import com.xaxin.qrcode.service.TrajetoService;
+import com.xaxin.qrcode.dto.ApiResponse;
 
 @RestController
 @RequestMapping("/api/qrcode")
@@ -36,7 +37,7 @@ public class QrCodeController {
     public ResponseEntity<?> lerQrCode(java.security.Principal principal, @RequestBody Map<String, String> body) {
         String caminho = body.get("caminho");
         if (caminho == null) {
-            return ResponseEntity.badRequest().body("Campo obrigatório: caminho");
+            return ResponseEntity.badRequest().body(ApiResponse.error("Campo obrigatório: caminho"));
         }
 
         try {
@@ -47,12 +48,12 @@ public class QrCodeController {
             String username = principal == null ? null : principal.getName();
             Checkpoint checkpoint = trajetoService.validarELancarQrCode(codigoLido, username);
             if (checkpoint == null) {
-                return ResponseEntity.ok("QR lido: " + numero + " (NÃO é um checkpoint válido)");
+                return ResponseEntity.ok(ApiResponse.message("QR lido: " + numero + " (NÃO é um checkpoint válido)"));
             }
 
-            return ResponseEntity.ok("QR lido: " + numero + " | Checkpoint: " + checkpoint.getTitulo() + " ✓");
+            return ResponseEntity.ok(ApiResponse.message("QR lido: " + numero + " | Checkpoint: " + checkpoint.getTitulo() + " ✓"));
         } catch (IllegalStateException | IOException e) {
-            return ResponseEntity.badRequest().body("Erro ao ler QR: " + e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Erro ao ler QR: " + e.getMessage()));
         }
     }
 
@@ -65,16 +66,16 @@ public class QrCodeController {
     public ResponseEntity<?> validarTexto(java.security.Principal principal, @RequestBody Map<String, String> body) {
         String codigo = body.get("codigo");
         if (codigo == null) {
-            return ResponseEntity.badRequest().body("Campo obrigatório: codigo");
+            return ResponseEntity.badRequest().body(ApiResponse.error("Campo obrigatório: codigo"));
         }
 
         String username = principal == null ? null : principal.getName();
         Checkpoint checkpoint = trajetoService.validarELancarQrCode(codigo, username);
         if (checkpoint == null) {
-            return ResponseEntity.ok("Código \"" + codigo + "\" NÃO é um checkpoint válido");
+            return ResponseEntity.ok(ApiResponse.message("Código \"" + codigo + "\" NÃO é um checkpoint válido"));
         }
 
-        return ResponseEntity.ok("Checkpoint válido: " + checkpoint.getTitulo() + " ✓");
+        return ResponseEntity.ok(ApiResponse.message("Checkpoint válido: " + checkpoint.getTitulo() + " ✓"));
     }
 
     /**
@@ -82,8 +83,8 @@ public class QrCodeController {
      * Retorna o progresso atual dos 4 checkpoints.
      */
     @GetMapping("/progresso")
-    public ResponseEntity<Map<String, Object>> progresso(java.security.Principal principal) {
+    public ResponseEntity<?> progresso(java.security.Principal principal) {
         String username = principal == null ? null : principal.getName();
-        return ResponseEntity.ok(trajetoService.getProgresso(username));
+        return ResponseEntity.ok(ApiResponse.ok(trajetoService.getProgresso(username)));
     }
 }
