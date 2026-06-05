@@ -36,46 +36,40 @@ if (-not $NoStart) {
 } else {
     if (-not (Wait-Url "$BaseUrl/teste.html" 20)) { Write-Error "App not responding at $BaseUrl"; exit 1 }
 }
-
 # Register
 $body = @{username=$Username; password=$Password; nome=$Name} | ConvertTo-Json
-try { $reg = Invoke-RestMethod -Uri "$BaseUrl/api/users/cadastro" -Method Post -Body $body -ContentType 'application/json' } catch { $reg = $null }
+try { Invoke-RestMethod -Uri "$BaseUrl/api/users/cadastro" -Method Post -Body $body -ContentType 'application/json' -ErrorAction SilentlyContinue | ConvertTo-Json | Out-File target\smoke-register-windows.json } catch { }
 
-# Login
-$login = @{username=$Username; password=$Password} | ConvertTo-Json
-try { $resp = Invoke-RestMethod -Uri "$BaseUrl/api/users/login" -Method Post -Body $login -ContentType 'application/json'; $token = $resp.token } catch { Write-Error "Login failed"; if ($proc) { $proc.Kill() }; exit 1 }
-
+# Login (support envelope .data.token)
+try { $login = Invoke-RestMethod -Uri "$BaseUrl/api/users/login" -Method Post -Body (@{username=$Username; password=$Password} | ConvertTo-Json) -ContentType 'application/json' -ErrorAction Stop; $login | ConvertTo-Json | Out-File target\smoke-login-windows.json } catch { Write-Error 'Login failed'; if ($proc) { $proc.Kill() }; exit 1 }
+$token = $null; if ($login -and $login.token) { $token = $login.token } elseif ($login.data -and $login.data.token) { $token = $login.data.token }
 Write-Output "Token: $token"
+if (-not $token) { Write-Error 'no token'; if ($proc) { $proc.Kill() }; exit 1 }
 
 # Validate checkpoints
 $codes = @('1001','2002','3003','4004')
-$results = @()
 foreach ($c in $codes) {
-    $b = @{codigo=$c} | ConvertTo-Json
-    try { $r = Invoke-RestMethod -Uri "$BaseUrl/api/qrcode/validar-texto" -Method Post -Body $b -Headers @{Authorization = "Bearer $token"} -ContentType 'application/json'; $results += @{code=$c; result=$r} } catch { $results += @{code=$c; error=$_.Exception.Message} }
+    try { Invoke-RestMethod -Uri "$BaseUrl/api/qrcode/validar-texto" -Method Post -Body (@{codigo=$c} | ConvertTo-Json) -Headers @{Authorization = "Bearer $token"} -ContentType 'application/json' | ConvertTo-Json | Out-File target\smoke-validate-$c-windows.json } catch { Add-Content -Path target\smoke-validate-$c-windows.json -Value $_.Exception.Message }
 }
 
-# Get progresso
-$prog = Invoke-RestMethod -Uri "$BaseUrl/api/qrcode/progresso" -Headers @{Authorization = "Bearer $token"} -Method Get
+# Get progresso (validate)
+try { $prog = Invoke-RestMethod -Uri "$BaseUrl/api/qrcode/progresso" -Headers @{Authorization = "Bearer $token"} -Method Get; $prog | ConvertTo-Json | Out-File target\smoke-progresso-windows.json } catch { Write-Error 'progresso failed'; if ($proc) { $proc.Kill() }; exit 1 }
 
-# Prepare temp image
+# Prepare temp image and upload
 $pngB64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII='
 $path = Join-Path -Path (Get-Location) -ChildPath "temp_test_image.png"
 [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($pngB64))
-
-# Upload
-$upload = curl.exe --silent --show-error --url "$BaseUrl/api/album/upload" -X POST -H "Authorization: Bearer $token" -F "file=@$path"
+try { $upload = curl.exe --silent --show-error --url "$BaseUrl/api/album/upload" -X POST -H "Authorization: Bearer $token" -F "file=@$path"; $upload | Out-File target\smoke-upload-windows.json } catch { Write-Error 'upload failed'; if ($proc) { $proc.Kill() }; exit 1 }
 try { $up = $upload | ConvertFrom-Json } catch { $up = $null }
 
 # Apply frame if upload ok
 if ($up -ne $null) {
     $fotoId = $up.id
-    $frameBody = @{frame=1} | ConvertTo-Json
-    try { $apply = Invoke-RestMethod -Uri "$BaseUrl/api/album/moldura/$fotoId" -Method Post -Body $frameBody -Headers @{Authorization = "Bearer $token"} -ContentType 'application/json' } catch { $apply = $null }
+    try { $apply = Invoke-RestMethod -Uri "$BaseUrl/api/album/moldura/$fotoId" -Method Post -Body (@{frame=1} | ConvertTo-Json) -Headers @{Authorization = "Bearer $token"} -ContentType 'application/json' ; $apply | ConvertTo-Json | Out-File target\smoke-frame-windows.json } catch { Add-Content -Path target\smoke-frame-windows.json -Value $_.Exception.Message }
 }
 
 # Final album
-$album = Invoke-RestMethod -Uri "$BaseUrl/api/album" -Headers @{Authorization = "Bearer $token"} -Method Get
+try { $album = Invoke-RestMethod -Uri "$BaseUrl/api/album" -Headers @{Authorization = "Bearer $token"} -Method Get; $album | ConvertTo-Json | Out-File target\smoke-album-windows.json } catch { Add-Content -Path target\smoke-album-windows.json -Value 'album failed' }
 
 # Write report
 $report = @()
@@ -84,19 +78,17 @@ $report += "\n## Environment"
 $report += "Base URL: $BaseUrl"
 $report += "Profile: $Profile"
 $report += "\n## Registration"
-$report += (if ($reg) { "Registered: $($reg.username)" } else { "Register skipped or already existed" })
+$report += (if (Test-Path target\smoke-register-windows.json) { Get-Content target\smoke-register-windows.json -Raw } else { "Register skipped or not returned" })
 $report += "\n## Login Token"
 $report += $token
-$report += "\n## Checkpoint validation results"
-foreach ($r in $results) { $report += "$($r.code): $($r.result -join '')" }
 $report += "\n## Progress"
-$report += (ConvertTo-Json $prog -Depth 5)
+$report += (Get-Content target\smoke-progresso-windows.json -Raw)
 $report += "\n## Upload response"
-$report += (if ($up) { ConvertTo-Json $up -Depth 5 } else { "Upload failed or returned non-json: $upload" })
+$report += (if (Test-Path target\smoke-upload-windows.json) { Get-Content target\smoke-upload-windows.json -Raw } else { "Upload failed" })
 $report += "\n## Apply frame response"
-$report += (if ($apply) { ConvertTo-Json $apply -Depth 5 } else { "Apply frame failed or skipped" })
+$report += (if (Test-Path target\smoke-frame-windows.json) { Get-Content target\smoke-frame-windows.json -Raw } else { "Apply frame failed or skipped" })
 $report += "\n## Final album"
-$report += (ConvertTo-Json $album -Depth 5)
+$report += (Get-Content target\smoke-album-windows.json -Raw)
 
 $report | Out-File -FilePath $ReportPath -Encoding utf8
 Write-Output "Report written to $ReportPath"
