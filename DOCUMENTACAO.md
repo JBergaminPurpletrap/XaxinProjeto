@@ -199,6 +199,64 @@ As entidades representam as tabelas do banco.
 
 ## Como funciona a aplicacao de molduras
 
+## Preparacao do backend antes do frontend
+
+Antes de iniciar o desenvolvimento do frontend, garanta que o backend esteja pronto e acessivel. Passos principais:
+
+- Variaveis de ambiente essenciais:
+  - `JWT_SECRET` — secreto do JWT (NUNCA comite este valor no repo). Ex: `export JWT_SECRET=uma_chave_segura`.
+  - `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` para conexao com PostgreSQL em producao.
+
+- Documentacao / OpenAPI:
+  - A API exposta pelo backend fica documentada automaticamente em runtime via Springdoc.
+  - URL do Swagger UI (dev): `/swagger-ui/index.html`
+  - URL do JSON OpenAPI: `/v3/api-docs`
+
+- Migrações (Flyway):
+  - O projeto usa Flyway. Migractions estao em `src/main/resources/db/migration`.
+  - Em CI/produçao, execute as migrações antes de iniciar a aplicacao (ou deixe a aplicacao aplicar automaticamente). Exemplo local:
+    ```bash
+    mvn -DskipTests flyway:migrate
+    # ou
+    mvn -DskipTests spring-boot:run -Dspring-boot.run.profiles=h2
+    ```
+
+- Actuator (health):
+  - Endpoints de health estao expostos: `/actuator/health` e `/actuator/info` (configuraveis em properties).
+
+- Uploads e armazenamento:
+  - Em dev a estrategia padrao e `app.upload.strategy=local` (pasta `uploads/`).
+  - Em producao considere usar S3 ou storage persistente — as propriedades de S3 estao como placeholders (`aws.s3.*`).
+
+- Git LFS / artefatos grandes:
+  - O repositório foi limpo para remover o JAR de `target/` e configurado para rastrear `*.jar` via Git LFS.
+  - Colaboradores devem re-clonar o repo ou executar `git lfs install` e atualizar seus clones.
+
+## Como rodar localmente (resumo rapido)
+
+1. Exportar segredo JWT e configurar DB (para H2 não precisa):
+```bash
+export JWT_SECRET=uma_chave_segura
+# Opcional para PostgreSQL
+export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/xaxindb
+export SPRING_DATASOURCE_USERNAME=usuario
+export SPRING_DATASOURCE_PASSWORD=senha
+```
+
+2. Rodar migrações (opcional, a aplicação faz isso automaticamente se `spring.flyway.enabled=true`):
+```bash
+mvn -DskipTests flyway:migrate
+```
+
+3. Build e run:
+```bash
+mvn -DskipTests package
+java -jar target/xaxin-projeto-qrcode-1.0.0.jar --spring.profiles.active=h2
+```
+
+4. Abrir Swagger UI: http://localhost:8080/swagger-ui/index.html
+
+
 ### FrameService
 
 A classe `FrameService` (pacote `frame`) e responsavel por sobrepor uma das tres molduras PNG sobre a foto escolhida pelo usuario.
